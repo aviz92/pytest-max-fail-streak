@@ -1,120 +1,93 @@
-![PyPI version](https://img.shields.io/pypi/v/<project-name>)
+![PyPI version](https://img.shields.io/pypi/v/pytest-max-fail-streak)
 ![Python](https://img.shields.io/badge/python->=3.12-blue)
 ![Development Status](https://img.shields.io/badge/status-stable-green)
 ![Maintenance](https://img.shields.io/maintenance/yes/2026)
-![PyPI](https://img.shields.io/pypi/dm/<project-name>)
-![License](https://img.shields.io/pypi/l/<project-name>)
+![PyPI](https://img.shields.io/pypi/dm/pytest-max-fail-streak)
+![License](https://img.shields.io/pypi/l/pytest-max-fail-streak)
 
 ---
 
-# 🧱 Dev Template Repository
-A comprehensive, production-ready template repository for initializing new development projects with consistent tooling, editor settings, GitHub workflows, and best practices. This template serves as a **baseline setup** for modern development workflows, reducing setup overhead and promoting standardization across all your codebases.
+# 💡 pytest-max-fail-streak
+A pytest plugin that stops the run after **N consecutive** failing tests.
 
-## 🎯 Overview
-This template provides a solid foundation for Python projects with:
-- **Pre-configured development environment** with VS Code settings and extensions
-- **Automated CI/CD pipelines** using GitHub Actions
-- **Code quality enforcement** with linting, formatting, and testing
-- **Professional project structure** with proper documentation and metadata
-- **Team collaboration tools** including PR templates and code ownership
+A burst of consecutive failures usually means the environment is down — a device is unreachable, a service doesn't respond — and every remaining test would fail for the same reason. Instead of waiting for all of them, stop early and get a clear signal.
 
 ---
 
-## 📁 What's Included
-
-### 🔧 Development Environment (`.vscode/`)
-- **`settings.json`**: Editor defaults (format on save, lint integration, tab size, Python interpreter)
-- **`extensions.json`**: Recommended extensions for Python development and team consistency
-- **`keybindings.json`**: Custom keyboard shortcuts for improved productivity
-- **`launch.json`**: Debugging configurations for Python applications
-
-### ⚙️ GitHub Configuration (`.github/`)
-- **Workflows**: Automated CI/CD pipelines for testing, linting, and publishing
-  - `publish_to_pypi.yml`: Automated PyPI package publishing
-- **`CODEOWNERS`**: Define default code reviewers per folder/path
-- **Issue templates**: Standardized bug reports and feature requests
-- **Pull request template**: Enforce contribution guidelines and checklists
-
-### 🧹 Code Quality & Style
-- **Python-specific configurations**:
-  - `pyproject.toml`: Core dependencies and development tools
-  - `MANIFEST.in`: Package distribution configuration
-  - `env.template`: Environment variables template
-- **`.gitignore`**: Preconfigured for Python, IDEs, and common tools
-- **`.cursor/`**: Cursor IDE specific configurations and instructions
-
-### 📄 Project Metadata
-- **`README.md`**: Comprehensive project documentation
-- **`LICENSE`**: MIT license for open-source projects
-- **`CHANGELOG.md`**: Version tracking and release notes
+## 📦 Installation
+```bash
+uv add pytest-max-fail-streak
+```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Features
+  - ✅ **Consecutive, not total** — complements pytest's `--maxfail`, which counts failures in total
+  - ✅ **Catches a broken environment** — setup and teardown errors count, so an unreachable device stops the run
+  - ✅ **A real stop** — the run ends like `--maxfail` ends it; remaining tests aren't run or reported as skipped
+  - ✅ **Fair counting** — skipped and xfailed tests are neutral, and each test counts once
+  - ✅ **Zero footprint without the flag** — nothing is registered, no hook runs
 
-### 1. Create New Repository
-Click **"Use this template"** on GitHub to create a new repository based on this template.
+---
 
-### 2. Clone and Setup
+## 🛠️ How to Use
 ```bash
-# Clone your new repository
-git clone https://github.com/your-username/your-new-repo.git
-cd your-new-repo
-
-# Create virtual environment
-uv venv
-source .venv/bin/activate   # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-uv sync --group dev # or uv pip install -r requirements.txt
-
-# Copy environment template
-cp env.template .env
-# Edit .env with your specific configuration
+pytest --maxfail-streak=5
+```
+The run stops after 5 failing tests in a row, with exit code `1` and a summary line:
+```
+!!!!!!!!!! stopping after 5 consecutive failures (--maxfail-streak=5) !!!!!!!!!!
 ```
 
-### 3. Customize for Your Project
-1. **Update project metadata**:
-   - Edit `README.md` with your project details
-   - Update `pyproject.toml` with your specific dependencies
-   - Modify `MANIFEST.in` for package distribution
+---
 
-2. **Configure environment**:
-   - Edit `.env` file with your environment variables
-   - Update VS Code settings in `.vscode/settings.json` if needed
+## ⚙️ How the Streak Is Counted
+Each test is judged once, after its teardown:
 
-### 4. Setup Pre-commit Hooks
-```bash
-# Install pre-commit hooks
-pre-commit install
+| Test result | Effect on the streak |
+|---|---|
+| Failed in setup, call or teardown (failure or error) | +1 |
+| Passed | Reset to 0 |
+| Skipped or xfailed | Unchanged |
+
+When the streak reaches `N`, the run stops after the current test.
+
+`N` must be a positive integer; any other value is a usage error (exit code 4).
+
+---
+
+## 🤔 `--maxfail-streak` vs. `--maxfail`
+| | `--maxfail=N` | `--maxfail-streak=N` |
+|---|---|---|
+| Counts | Failures in total | Failures in a row |
+| Typical signal | "Too much is broken" | "The environment is down" |
+| A passing test in between | Doesn't matter | Resets the count |
+
+Both can be used together; whichever is reached first stops the run.
+
+---
+
+## ▶️ Usage Examples
+### Enable in `pytest.ini` for CI
+```ini
+[pytest]
+addopts =
+    --maxfail-streak=5
 ```
 
-```bash
-# Run on all files (optional, for existing codebase)
-pre-commit run --all-files
-```
+---
 
-```bash
-# Run on all files excluding specific files (example: main.py) (optional, for existing codebase)
-pre-commit run --files $(git ls-files | grep -v "main.py")
-```
+## ⚠️ Notes
+- With `pytest-xdist`, results arrive from several workers interleaved, so "consecutive" follows the order they arrive in, not the order of the test files.
 
-**Automatic Usage:**
-Once installed, pre-commit will automatically run on every `git commit`. If any hook fails:
-- **Fix the issues** and commit again
-- **Skip hooks** (not recommended): `git commit --no-verify`
+---
 
-### 5. Go-Task
-This template uses **Go-Task** to provide a consistent interface for common development commands.
-
-```bash
-# List available tasks
-task --list
-```
-
-Use `task <task-name>` to run predefined workflows such as linting, formatting, testing, or other project utilities.
-
-All tasks are defined in `Taskfile.yml` at the repository root and are intended to standardize local development and CI usage.
+## 🔁 Migrating from pytest-plugins
+This plugin was previously `max_fail_streak` in `pytest-plugins`. Both register the `--maxfail-streak` option,
+so don't install them together until you're on a `pytest-plugins` release without it.
+Changes when migrating:
+- The run now stops instead of skipping the remaining tests.
+- Setup and teardown errors now count; skipped tests no longer reset the streak.
 
 ---
 
@@ -130,15 +103,8 @@ Additions that promote clean, productive, and maintainable development are alway
 
 ---
 
-## 📋 Development Checklist
-When using this template for a new project:
-
-- [ ] Update README.md with project-specific information
-- [ ] Configure environment variables in .env
-- [ ] Update pyproject.toml with project dependencies
-- [ ] Set up GitHub repository secrets for CI/CD
-- [ ] Configure package metadata in setup.py or pyproject.toml
-- [ ] Add project-specific tests
+## 📄 License
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
